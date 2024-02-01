@@ -12,8 +12,7 @@ RUN apt-get update && \
         python3-dev \
         python3-opencv \
         libglib2.0-0
-# Install any python packages you need
-COPY requirements.txt requirements.txt
+
 
 # Upgrade pip
 RUN python3 -m pip install --upgrade pip
@@ -21,16 +20,20 @@ RUN python3 -m pip install --upgrade pip
 # Install PyTorch and torchvision
 RUN pip3 install torch torchvision torchaudio -f https://download.pytorch.org/whl/cu111/torch_stable.html
 
-RUN python3 -m pip install -r requirements.txt
 
 # Set the working directory
 WORKDIR /app
 
+
+# Copy application code into the container 
+COPY . /app 
+
+RUN python3 -m pip install -r requirements.txt
+
+
 # Set the entrypoint
 #ENTRYPOINT [ "python3" ]
 
-# Copy application code into the container 
-COPY . /qpp 
 
 
 # Expose port 8080 
