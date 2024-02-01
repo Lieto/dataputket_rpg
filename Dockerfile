@@ -28,6 +28,8 @@ WORKDIR /app
 # Copy application code into the container 
 COPY . /app 
 
+RUN python3 -m pip install --upgrade setuptools 
+
 RUN python3 -m pip install -r requirements.txt
 
 

@@ -2,5 +2,6 @@ python-dotenv
 fastapi
 loguru
 git+https://github.com/huggingface/transformers.git
+gradio
 
 
