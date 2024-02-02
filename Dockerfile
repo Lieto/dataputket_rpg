@@ -28,9 +28,27 @@ WORKDIR /app
 # Copy application code into the container 
 COPY . /app 
 
+RUN mkdir -p /app/repositories
+RUN mkdir -p /app/generated_images/demo_imgs 
+
+WORKDIR /app/repositories 
+
+RUN git clone https://github.com/Stability-AI/generative-models
+RUN git clone https://github.com/Stability-AI/stablediffusion
+RUN git clone https://github.com/sczhou/CodeFormer
+RUN git clone https://github.com/crowsonkb/k-diffusion
+RUN git clone https://github.com/salesforce/BLIP
+WORKDIR /app 
+
+RUN export PYTHONPATH=/app/repositories/stablediffusion
+
 RUN python3 -m pip install --upgrade setuptools 
 
 RUN python3 -m pip install -r requirements.txt
+
+RUN python3 -m pip install -e /app/repositories/stablediffusion
+RUN python3 -m pip install -e /app/repositories/k-diffusion
+RUN python3 -m pip install -e /app/repositories/generative-models 
 
 
 # Set the entrypoint
@@ -39,7 +57,7 @@ RUN python3 -m pip install -r requirements.txt
 
 
 # Expose port 8080 
-EXPOSE 8080 
+EXPOSE 8000
 # Set the default command to run when the container starts 
-#CMD ["python", "hello.py"]
+#CMD ["python3", "hello.py"]
 

@@ -11,6 +11,11 @@ from pydantic import BaseModel
 from mllm import GPT4
 from modules import errors, extensions
 
+sys.path.append('/app/repositories/stablediffusion')
+sys.path.append('/app/repositories/k-diffusion')
+sys.path.append('/app/repositories/generative-models')
+
+
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -321,4 +326,4 @@ def greet():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("hello:app", reload=True)
+    uvicorn.run("hello:app", host="0.0.0.0", port=8000, reload=True)

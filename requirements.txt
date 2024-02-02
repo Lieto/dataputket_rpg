@@ -3,5 +3,33 @@ fastapi
 loguru
 git+https://github.com/huggingface/transformers.git
 gradio
+pytorch-lightning==1.9.4
+einops
+kornia 
+open-clip-torch
+omegaconf 
+GitPython
+tomesd
+scikit-image
+psutil
+jsonmerge
+dctorch 
+torchdiffeq
+torchsde
+clean-fid
+clip 
+piexif 
+lark 
+tensorboard 
+blendmodes
+
+
+
+
+
+
+
+
+
 
 
