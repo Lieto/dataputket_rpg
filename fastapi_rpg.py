@@ -5,6 +5,7 @@ import time
 import torch
 from dotenv import load_dotenv
 from fastapi import APIRouter, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse 
 from loguru import logger
 from pydantic import BaseModel
@@ -12,11 +13,13 @@ from pydantic import BaseModel
 from mllm import GPT4
 from modules import errors, extensions
 
+# Add repository paths to system path
 sys.path.append('/app/repositories/stablediffusion')
 sys.path.append('/app/repositories/k-diffusion')
 sys.path.append('/app/repositories/generative-models')
 
-
+# Use dotenv to store secret /private keys to apis (OpenAI GPT-4). At the moment you 
+# have to copy '.env' file to server to use it
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -30,7 +33,7 @@ def initialize(model_name=None):
     if os.path.exists(shared.config_filename):
         shared.opts.load(shared.config_filename)
     extensions.list_extensions()
-    #startup_timer.record("list extensions")
+    
     
     from modules import devices
     devices.device, devices.device_interrogate, devices.device_gfpgan, devices.device_esrgan, devices.device_codeformer = \
@@ -82,7 +85,6 @@ def RPG(user_prompt,
         diffusion_model, 
         version, 
         split_ratio, 
-        #key, 
         activate=True, 
         use_base=False, 
         base_ratio=0, 
@@ -94,7 +96,8 @@ def RPG(user_prompt,
         steps=20,
         height=1024,
         width=1024):
-       
+    
+    # Get layout and regional description prompt for distincs areas from openai api gpt-4
     openai_api_key = OPENAI_API_KEY  
    
     import modules.txt2img
@@ -123,6 +126,9 @@ def RPG(user_prompt,
     
     logger.debug(f"regional settings: {regional_settings}") 
     
+    # Use txt2img to get image from prompt. Notice: this can take a while at the moment 
+    # depending on the prompt length, resolution and the number of iterations. 
+    # (Tesla K80 GPU: 20 iters, 1024x1024, 50-100 characters user prompt -> 4 mins)
     image, _, _, _ = modules.txt2img.txt2img(
         id_task="task", 
         prompt=regional_prompt,
@@ -157,36 +163,46 @@ def RPG(user_prompt,
     return image 
 
 
-
+# Fastapi expects this post data from client
 class AppParams(BaseModel):
+    # User prompt: Text prompt from client to use as base to describe image content
     user_prompt: str = "Yellow Maserati sport car on Alp mountain highway in the morning"
-    #version_list: list = ["multi-attribute","complex-object"]
+    # Version number: 0 = multi-attribute, 1 = complex object, 2 = natural object, 3 = human-like
     version_number: int = 0
-    #version: str = "multi-attribute"
+    # Steps: Number of iterations for image generation
     steps: int = 20
+    # model_name: Name of model to use for image generation
+    # (albedobaseXL_v20.safetensors is predownloaded to server) 
     model_name: str = 'albedobaseXL_v20.safetensors'
-    activate: bool = True
-    use_base: bool = False
+    # activate: Activate regional settings (0 = deactivate, 1 = activate)
+    activate: int = 1
+    # use_base: Use base prompt (0 = deactivate, 1 = activate)
+    use_base: int = 0
+    # base_ratio: Ratio of base prompt to regional prompt
     base_ratio: float = 0.3
+    # base_prompt: Base prompt to use as base to describe image content
     base_prompt: str = ""
+    # batch_size: Batch size for image generation
     batch_size: int = 1
+    # seed: Random seed for image generation
     seed: int = 1234
+    # cfg: Configuration for image generation
     cfg: int = 5
-    steps: int = 20
+    # height: Height of image to generate
     height: int = 1024
+    # width: Width of image to generate
     width: int = 1024
 
-
+# Add router to app
 router = APIRouter(prefix="/dataputket_rpg")
 
 
-
+# Post request to generate image from prompt
 @router.post("/")
 def rpg(params: AppParams):
     version_list = ["multi-attribute","complex-object"]
     logger.debug(f"params: {params}")
     user_prompt = params.user_prompt
-    #version_list = params.version_list
     version_number = params.version_number
     steps = params.steps
     model_name = params.model_name
@@ -214,22 +230,28 @@ def rpg(params: AppParams):
         
     appendix = 'gpt4'
     
+    if 1 == activate:
+        activate = True 
+    else:
+        activate = False 
+        
+    if 1 == use_base:
+        use_base = True
+    else:
+        use_base = False
+
+    # Initialize model
     initialize(model_name= 'albedobaseXL_v20.safetensors')
         
     image=RPG(user_prompt=user_prompt,
         diffusion_model=model_name,
         version=version,
         split_ratio=None,
-        #key=api_key,
-        #use_gpt=use_gpt,
-        #use_local=use_local,
-        #llm_path=llm_path,
         use_base=use_base,
         base_ratio=base_ratio,
         base_prompt=base_prompt,
         batch_size=batch_size,
         seed=seed,
-        #demo=demo,
         use_personalized=False,
         cfg=cfg,
         steps=steps,
@@ -239,6 +261,7 @@ def rpg(params: AppParams):
     logger.debug(f"len images: {len(image)}")
     file_names = []
     
+    # Save images to server (TODO: save to gcp bucket for persistence)
     for i in range(len(image)):
         timestamp = time.strftime("%Y%m%d-%H%M%S")
         file_name = f"{appendix}_image_{timestamp}.png"
@@ -246,85 +269,32 @@ def rpg(params: AppParams):
         image[i].save(f"generated_imgs/{file_name}")
 
     # Create response and send it 
+    # At the moment you can use FastAPI endpoint "/docs/" on your browser to create post
+    # call with json-data for parameters and view image result after a while 
+    # (processing can take a while)
+    # TODO: After images are saved to bucket, maybe create create get request to 
+    # retrieve latest image from bucket
     return FileResponse(f"generated_imgs/{file_names[0]}", media_type="image/png")  
     
 
-param_dict = {"user_prompt": "Yellow Maserati sport car on Alp mountain highway in the morning",
-              "version_list": ["multi-attribute","complex-object"],
-              "version_number": 0,
-              "version": "multi-attribute",
-              "steps": 20,
-              "model_name": 'albedobaseXL_v20.safetensors',
-              "activate": True,
-              "use_base": False,
-              "base_ratio": 0.3,
-              "base_prompt": "",
-              "batch_size": 1,
-              "seed": 1234,
-              "cfg": 5,
-              "steps": 20,
-              "height": 1024,
-              "width": 1024
-            } 
-
-
+# Finally create application, add router and run app
 app = FastAPI()
 app.include_router(router)
 
-@app.get("/hi")
-def greet():
-    
-    user_prompt = "Yellow Maserati sport car on Alp mountain highway in the morning"
-    version_list = ["multi-attribute","complex-object"]
-    version_number = 0
-    version = version_list[version_number]  
-    steps = 20 
-    model_name = 'albedobaseXL_v20.safetensors'
-    activate = True
-    use_base = False
-    base_ratio = 0.3
-    base_prompt = ""   
-    batch_size = 1
-    seed = 1234 
-    cfg = 5   
-    steps = 20
-    height = 1024
-    width = 1024
-    
-    
+origins = ["*"]
 
-    appendix = 'gpt4'
+app.add_middleware(
+    CORSMiddleware, 
+    allowed_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-    initialize(model_name=model_name)
-    
-    image=RPG(user_prompt=user_prompt,
-        diffusion_model=model_name,
-        version=version,
-        split_ratio=None,
-        #key=api_key,
-        #use_gpt=use_gpt,
-        #use_local=use_local,
-        #llm_path=llm_path,
-        use_base=use_base,
-        base_ratio=base_ratio,
-        base_prompt=base_prompt,
-        batch_size=batch_size,
-        seed=seed,
-        #demo=demo,
-        use_personalized=False,
-        cfg=cfg,
-        steps=steps,
-        height=height,
-        width=width)
-    
-    print(f"len images: {len(image)}")
-    for i in range(len(image)):
-        timestamp = time.strftime("%Y%m%d-%H%M%S")
-        file_name = f"{appendix}_image_{timestamp}.png"
-        image[i].save(f"generated_imgs/{file_name}")
-
-    return "Hello? World?"
-
+# At the moment not the safest way to expose app to outside world (we are still in 
+# developemnt stage). Maybe use nginx or traefik for this. And use authentication to
+# limit access
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("hello:app", host="0.0.0.0", port=8000, reload=True)
+    
+    uvicorn.run("fastapi_rpg:app", host="0.0.0.0", port=8000, reload=False)
