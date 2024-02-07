@@ -1,3 +1,5 @@
+# The code is importing necessary modules and libraries for the application. Here's a
+# breakdown of what each import statement does:
 import os
 import sys
 import time
@@ -13,18 +15,34 @@ from pydantic import BaseModel
 from mllm import GPT4
 from modules import errors, extensions
 
-# Add repository paths to system path
+# The code is adding the paths of three repositories (`stablediffusion`, `k-diffusion`,
+# and `generative-models`) to the system path. This allows the code to import modules and
+# files from these repositories. By adding these paths to the system path, the code
+# ensures that the Python interpreter can find and access the necessary files and modules
+# from these repositories.
+
 sys.path.append('/app/repositories/stablediffusion')
 sys.path.append('/app/repositories/k-diffusion')
 sys.path.append('/app/repositories/generative-models')
 
 # Use dotenv to store secret /private keys to apis (OpenAI GPT-4). At the moment you 
 # have to copy '.env' file to server to use it
+# `load_dotenv()` is a function from the `dotenv` library in Python. It is used to load
+# the environment variables from a `.env` file into the current environment.
 load_dotenv()
+
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 def initialize(model_name=None):
+    """
+    The `initialize` function initializes various modules and loads models for a stable
+    diffusion model in Python.
+    
+    :param model_name: The `model_name` parameter is used to specify the name of the model
+    that you want to load. It is an optional parameter, so if you don't provide a value, the
+    function will not load any specific model
+    """
     from modules import options, shared, shared_options
     from modules.shared import cmd_opts
     shared.options_templates = shared_options.options_templates #{}
@@ -99,7 +117,7 @@ def RPG(user_prompt,
     
     # Get layout and regional description prompt for distincs areas from openai api gpt-4
     openai_api_key = OPENAI_API_KEY  
-   
+
     import modules.txt2img
     input_prompt = user_prompt
     params = GPT4(input_prompt,version,openai_api_key)
@@ -164,6 +182,10 @@ def RPG(user_prompt,
 
 
 # Fastapi expects this post data from client
+# The `AppParams` class represents the parameters for generating an image, including the
+# user prompt, version number, number of steps, model name, activation status, base prompt
+# usage, base prompt ratio, batch size, random seed, configuration, height, and width of
+# the image.
 class AppParams(BaseModel):
     # User prompt: Text prompt from client to use as base to describe image content
     user_prompt: str = "Yellow Maserati sport car on Alp mountain highway in the morning"
