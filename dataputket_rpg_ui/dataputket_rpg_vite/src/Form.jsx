@@ -2,19 +2,19 @@ import React, { useState } from'react';
 import axios from 'axios';
 
 const FormComponent = () => {
-    const [user_prompt, setUserPrompt] = useState('');
-    const [version_number, setVersionNumber] = useState('');
-    const [steps, setSteps] = useState('');
-    const [model_name, setModelName] = useState('');
-    const [activate, setActivate] = useState('');
-    const [use_base, setUseBase] = useState('');
-    const [base_ratio, setBaseRatio] = useState('');
+    const [user_prompt, setUserPrompt] = useState('Red Ferrari on Italian city street');
+    const [version_number, setVersionNumber] = useState(0);
+    const [steps, setSteps] = useState(10);
+    const [model_name, setModelName] = useState("albedobaseXL_v20.safetensors");
+    const [activate, setActivate] = useState(1);
+    const [use_base, setUseBase] = useState(0);
+    const [base_ratio, setBaseRatio] = useState(0.3);
     const [base_prompt, setBasePrompt] = useState('');
-    const [batch_size, setBatchSize] = useState('');
-    const [seed, setSeed] = useState('');
-    const [cfg, setCfg] = useState('');
-    const [width, setWidth] = useState('');
-    const [height, setHeight] = useState('');
+    const [batch_size, setBatchSize] = useState(1);
+    const [seed, setSeed] = useState(1234);
+    const [cfg, setCfg] = useState(5);
+    const [width, setWidth] = useState(1024);
+    const [height, setHeight] = useState(1024);
     
     const handleSubmit = async (event) => {
         event.preventDefault();
@@ -40,7 +40,8 @@ const FormComponent = () => {
                 method: 'post',
                 url: 'http://localhost:8000/dataputket_rpg',
                 data: payload,
-                headers: { 'Content-Type': 'application/json'}
+                headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}`, 'Content-Type': 'application/json'} 
+
             });
             console.log(response.data);
         } catch (error) {
@@ -51,56 +52,56 @@ const FormComponent = () => {
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-                <label htmlFor="user_promp" className="block text-sm font-medium test-gray-700">User Prompt</label>
-                <input id='user_promp' name='user_prompt' type="text" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={name} onChange={(e) => setName(e.target.value)} />
+                <label htmlFor="user_prompt" className="block text-sm font-medium test-gray-700">User Prompt</label>
+                <input id='user_prompt' name='user_prompt' type="text" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={user_prompt} onChange={(e) => setUserPrompt(e.target.value)} />
             </div>
             <div>
                 <label htmlFor="version_number" className="block text-sm font-medium test-gray-700">Version Number</label>
-                <input id='version_number' name='version_number' type="number" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={name} onChange={(e) => setName(e.target.value)} />
+                <input id='version_number' name='version_number' type="number" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={version_number} onChange={(e) => setVersionNumber(e.target.value)} />
             </div>
             <div>
                 <label htmlFor="steps" className="block text-sm font-medium test-gray-700">Steps</label>
-                <input id='steps' name='steps' type="number" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={name} onChange={(e) => setName(e.target.value)} />
+                <input id='steps' name='steps' type="number" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={steps} onChange={(e) => setSteps(e.target.value)} />
             </div>
             <div>
                 <label htmlFor="model_name" className="block text-sm font-medium test-gray-700">Model Name</label>
-                <input id='model_name' name='model_name' type="text" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={name} onChange={(e) => setName(e.target.value)} />
+                <input id='model_name' name='model_name' type="text" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={model_name} onChange={(e) => setModelName(e.target.value)} />
             </div>
             <div>
                 <label htmlFor="activate" className="block text-sm font-medium test-gray-700">Activate</label>
-                <input id='activate' name='activate' type="checkbox" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={name} onChange={(e) => setName(e.target.value)} />
+                <input id='activate' name='activate' type="number" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={activate} onChange={(e) => setActivate(e.target.value)} />
             </div>
             <div>
                 <label htmlFor="use_base" className="block text-sm font-medium test-gray-700">Use Base</label>
-                <input id='use_base' name='use_base' type="checkbox" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={name} onChange={(e) => setName(e.target.value)} />
+                <input id='use_base' name='use_base' type="number" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={use_base} onChange={(e) => setUseBase(e.target.value)} />
             </div>
             <div>
                 <label htmlFor="base_ratio" className="block text-sm font-medium test-gray-700">Base Ratio</label>
-                <input id='base_ratio' name='base_ratio' type="number" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={name} onChange={(e) => setName(e.target.value)} />
+                <input id='base_ratio' name='base_ratio' type="number" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={base_ratio} onChange={(e) => setBaseRatio(e.target.value)} />
             </div>
             <div>
                 <label htmlFor="base_prompt" className="block text-sm font-medium test-gray-700">Base Prompt</label>
-                <input id='base_prompt' name='base_prompt' type="text" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={name} onChange={(e) => setName(e.target.value)} />
+                <input id='base_prompt' name='base_prompt' type="text" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={base_prompt} onChange={(e) => setBasePrompt(e.target.value)} />
             </div>
             <div>
                 <label htmlFor="batch_size" className="block text-sm font-medium test-gray-700">Batch Size</label>
-                <input id='batch_size' name='batch_size' type="number" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={name} onChange={(e) => setName(e.target.value)} />
+                <input id='batch_size' name='batch_size' type="number" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={batch_size} onChange={(e) => setBatchSize(e.target.value)} />
             </div>
             <div>
                 <label htmlFor="seed" className="block text-sm font-medium test-gray-700">Seed</label>
-                <input id='seed' name='seed' type="number" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={name} onChange={(e) => setName(e.target.value)} />
+                <input id='seed' name='seed' type="number" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={seed} onChange={(e) => setSeed(e.target.value)} />
             </div>
             <div>
                 <label htmlFor="cfg" className="block text-sm font-medium test-gray-700">Cfg</label>
-                <input id='cfg' name='cfg' type="number" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={name} onChange={(e) => setName(e.target.value)} />
+                <input id='cfg' name='cfg' type="number" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={cfg} onChange={(e) => setCfg(e.target.value)} />
             </div>
             <div>
                 <label htmlFor="width" className="block text-sm font-medium test-gray-700">Image Width</label>
-                <input id='width' name='width' type="number" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={name} onChange={(e) => setName(e.target.value)} />
+                <input id='width' name='width' type="number" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={width} onChange={(e) => setWidth(e.target.value)} />
             </div>
             <div>
                 <label htmlFor="height" className="block text-sm font-medium test-gray-700">Image Height</label>
-                <input id='height' name='height' type="number" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={name} onChange={(e) => setName(e.target.value)} />
+                <input id='height' name='height' type="number" required className='mt-1 block w-full p-2 border border-gray-300 rounded-md' value={height} onChange={(e) => setHeight(e.target.value)} />
             </div>
 
             <button type="submit" className="w-full py-2 px-4 border border-transparent rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Submit</button>
