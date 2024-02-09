@@ -1,30 +1,57 @@
 import axios from 'axios';
-import { useState } from'react';
-import { useHistory } from'react-router-dom';
+import { useState } from 'react';
+import { Redirect } from 'react-router-dom';
+
+import PropTypes from 'prop-types'
+import Form from './Form'
+import { Route } from 'react-router-dom/cjs/react-router-dom.min';
+
 
 function LoginForm() {
     const [username, setUserName] = useState('');   
     const [password, setPassword] = useState('');
-    const history = useHistory();
+    const [loggedIn, setLoggedIn] = useState(false);
+
+
+    //const history = useHistory();
+    
 
     const handleSubmit = async (event) => {
+        //const history = useHistory();
         event.preventDefault();
+        
+        const response = await fetch('http://localhost:8000/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+                'username': username,
+                'password': password,	
+            }),
+        });
 
-        try {
-            const response = await axios.post('http://localhost:8000/auth/token', {
-                username: username,
-                password: password ,     
-            });
-           
+        const data = await response.json();
+        console.log(data)
+        if (response.ok) {
+            //setToken(data.access_token);
+            console.log(data.access_token)
+            sessionStorage.setItem('access_token', data.access_token);  
+            setLoggedIn(true);
+            //history.push('/dataputket_rpg');
+            //return <Form />;
+            //return redirect('/dataputket_rpg')
 
-            console.log(response.data.access_token);
-            localStorage('access_token', response.data.access_token);
-            history.pushState('/dataputket_rpg', null, '/dataputket_rpg');
-        } catch (error) {
-            console.error(error);
+        } else {
+            console.error("Invald username or password")
+
         }
     };
 
+    if (loggedIn) {
+        return <Form  /> 
+    }
+            
     return (
         <form onSubmit={handleSubmit} className='space-y-4'>
             <div>
@@ -40,5 +67,7 @@ function LoginForm() {
         </form>
     );
 }
+
+
 
 export default LoginForm;
