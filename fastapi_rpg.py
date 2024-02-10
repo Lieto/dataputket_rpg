@@ -1,19 +1,28 @@
 import time 
+import os 
 
 from fastapi import FastAPI, Depends, HTTPException, status, Header
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPBearer, OAuth2PasswordBearer, OAuth2PasswordRequestForm, HTTPAuthorizationCredentials
+import jwt
+# The code is importing necessary modules and libraries for the application. Here's a
+# breakdown of what each import statement does:
+
+import sys
+
+
+from fastapi import FastAPI, Depends, HTTPException, status, Header, APIRouter
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordRequestForm, HTTPAuthorizationCredentials    
 from fastapi.responses import FileResponse 
 from datetime import datetime, timedelta
-import jwt 
 from passlib.context import CryptContext
 from typing import Optional, Annotated
 from pydantic import BaseModel
 import dotenv 
-#from jose import JWTError, jwt
-import os 
+
 from loguru import logger 
-from dataputket_rpg import initialize, RPG 
+from dataputket_rpg import initialize, RPG  
 
 dotenv.load_dotenv()
 
@@ -33,6 +42,67 @@ USERS = [
 access_token = None 
   
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)      
+
+def authenticate_token(token: OAuth2PasswordBearer = Depends(oauth2_scheme)):
+    
+    print(f"token: {token}")
+    print(f"access_token: {os.getenv('ACCESS_TOKEN')}")
+    
+    access_token = os.getenv("ACCESS_TOKEN")  
+    
+    if token != access_token:
+        raise HTTPException(status_code=401, 
+                            detail="Invalid authentication credentials", 
+                            headers={"WWW-Authenticate": "Bearer"},
+                            )
+    return True 
+   
+def authenticate_user(username: str, password: str):
+    user = next(
+        (user for user in USERS if user["username"] == username), None
+    )
+    if not user:
+        return False
+    if not verify_password(password, user["password"]):
+        return False
+    return user
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    #encoded_jwt = jwt.encode_payload(to_encode)
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise HTTPException(status_code=401, detail="Could not validate credentials", headers={"WWW-Authenticate": "Bearer"}) 
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Could not validate credentials", headers={"WWW-Authenticate": "Bearer"})
+    user = next((user for user in USERS if user["username"] == username), None)
+    if user is None:
+        raise HTTPException(status_code=401, detail="User not found", headers={"WWW-Authenticate": "Bearer"})
+    return user
+
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto") 
+hash1 = pwd_context.hash("dataputket_test_Lollero123")
+USERS = [
+    {"username": "dataputket_test", "password": hash1},
+]
+
+access_token = None 
+
 
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)      
@@ -122,8 +192,7 @@ class AppParams(BaseModel):
 
 # Finally create application, add router and run app
 app = FastAPI()
-#app.include_router
- 
+
 @app.post("/token")
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     user = authenticate_user(form_data.username, form_data.password)
@@ -131,7 +200,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect username or password")
     access_token = create_access_token({"sub": user["username"]})
     os.environ["ACCESS_TOKEN"] = access_token   
-    return {"access_token": access_token, "token_type": "bearer"}
+
 
 @app.get("/users/me")
 async def read_users_me(current_user: dict = Depends(get_current_user)):
