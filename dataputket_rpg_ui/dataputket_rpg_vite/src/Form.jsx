@@ -1,6 +1,13 @@
-import React, { useState } from'react';
+import React, { useState, useEffect } from'react';
 import axios from 'axios';
 
+const ImageCanvas = () => {
+    const [imageData, setImageData ] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+};
+
+    
 const FormComponent = () => {
     const [user_prompt, setUserPrompt] = useState('Red Ferrari on Italian city street');
     const [version_number, setVersionNumber] = useState(0);
@@ -16,7 +23,14 @@ const FormComponent = () => {
     const [width, setWidth] = useState(1024);
     const [height, setHeight] = useState(1024);
     
+    const [imageData, setImageData ] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+   
     const handleSubmit = async (event) => {
+        setLoading(true);
+        setError(null);
+
         event.preventDefault();
 
         const payload = {
@@ -35,19 +49,31 @@ const FormComponent = () => {
             height: height
         };
 
+        const token = sessionStorage.getItem('access_token');
+        console.log(token);
         try {
             const response = await axios({
                 method: 'post',
-                url: 'http://localhost:8000/dataputket_rpg',
+                url: 'http://34.140.132.125:8000/dataputket_rpg',
                 data: payload,
-                headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}`, 'Content-Type': 'application/json'} 
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json'}, 
+                responseType: 'blob',
+
 
             });
             console.log(response.data);
+            const reader = new FileReader();
+            reader.onload = (event) => setImageData(event.target.result);
+            reader.readAsDataURL(response.data);
+
         } catch (error) {
             console.log(error);
+            setError('Error fetchning result: ' + error.message);
+        } finally {
+            setLoading(false);  
         }
     };
+
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -105,8 +131,21 @@ const FormComponent = () => {
             </div>
 
             <button type="submit" className="w-full py-2 px-4 border border-transparent rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Submit</button>
+
+            <div>
+                { loading ? (
+                    <p>Loading image...</p>
+                ) : error ? (
+                    <p>{ error }</p>
+                ) : (
+                <img src={imageData} alt="Image from FastAPI" />
+                
+                ) }
+            </div>
+        
         </form>
-    );
-};
+    )
+                };
 
 export default FormComponent;
+
