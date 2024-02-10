@@ -1,49 +1,89 @@
-# The code is importing necessary modules and libraries for the application. Here's a
-# breakdown of what each import statement does:
-import os
-import sys
-import time
+import time 
 
-import torch
-from dotenv import load_dotenv
-from fastapi import APIRouter, FastAPI, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm    
-from fastapi_login import LoginManager
+from fastapi import FastAPI, Depends, HTTPException, status, Header
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, OAuth2PasswordBearer, OAuth2PasswordRequestForm, HTTPAuthorizationCredentials
 from fastapi.responses import FileResponse 
-from loguru import logger
+from datetime import datetime, timedelta
+import jwt 
+from passlib.context import CryptContext
+from typing import Optional, Annotated
 from pydantic import BaseModel
-from typing import Annotated
+import dotenv 
+#from jose import JWTError, jwt
+import os 
+from loguru import logger 
+from dataputket_rpg import initialize, RPG 
 
+dotenv.load_dotenv()
 
+app = FastAPI()
+security = HTTPBearer()
 
-# Use dotenv to store secret /private keys to apis (OpenAI GPT-4). At the moment you 
-# have to copy '.env' file to server to use it
-# `load_dotenv()` is a function from the `dotenv` library in Python. It is used to load
-# the environment variables from a `.env` file into the current environment.
-load_dotenv()
+SECRET_KEY = os.getenv("SECRET_KEY")
+SECRET_KEY ="your_secret_key"
+ALGORITHM = "HS256"
 
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto") 
+hash1 = pwd_context.hash("dataputket_test_Lollero123")
+USERS = [
+    {"username": "dataputket_test", "password": hash1},
+]
 
+access_token = None 
+  
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-SECRET = os.getenv("SECRET")
-manager = LoginManager(SECRET, tokenUrl="/auth/token")
-fake_users_db = {
-    "dataputket_test": {
-        "username": "dataputket_test",
-        "hashed_password": "fakehashedsecret",
-    }
-}
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)      
 
-def fake_hash_password(password: str):
-    return "fakehashed" + password
-
-@manager.user_loader
-def load_user(username: str):
-    user_dict = fake_users_db.get(username)
-    if user_dict:
-        return user_dict    
+def authenticate_token(token: OAuth2PasswordBearer = Depends(oauth2_scheme)):
     
+    print(f"token: {token}")
+    print(f"access_token: {os.getenv('ACCESS_TOKEN')}")
+    
+    access_token = os.getenv("ACCESS_TOKEN")  
+    
+    if token != access_token:
+        raise HTTPException(status_code=401, 
+                            detail="Invalid authentication credentials", 
+                            headers={"WWW-Authenticate": "Bearer"},
+                            )
+    return True 
+   
+def authenticate_user(username: str, password: str):
+    user = next(
+        (user for user in USERS if user["username"] == username), None
+    )
+    if not user:
+        return False
+    if not verify_password(password, user["password"]):
+        return False
+    return user
 
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    #encoded_jwt = jwt.encode_payload(to_encode)
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise HTTPException(status_code=HTTP_401_UNAUTHORIZED, detail="Could not validate credentials", headers={"WWW-Authenticate": "Bearer"})
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=HTTP_401_UNAUTHORIZED, detail="Could not validate credentials", headers={"WWW-Authenticate": "Bearer"})
+    user = next((user for user in USERS if user["username"] == username), None)
+    if user is None:
+        raise HTTPException(status_code=HTTP_401_UNAUTHORIZED, detail="User not found", headers={"WWW-Authenticate": "Bearer"})
+    return user 
 
 # Fastapi expects this post data from client
 # The `AppParams` class represents the parameters for generating an image, including the
@@ -79,36 +119,35 @@ class AppParams(BaseModel):
     # width: Width of image to generate
     width: int = 1024
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-    
-# Add router to app
-router = APIRouter(prefix="/dataputket_rpg")
 
-@router.post("/auth/token")
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    user_dict = fake_users_db.get(form_data.username)
-    if not user_dict:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    hashed_password = user_dict["hashed_password"]
-    if not manager.verify_password(form_data.password, hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    access_token = manager.create_access_token(
-        data={"sub": form_data.username}
-    )
+# Finally create application, add router and run app
+app = FastAPI()
+#app.include_router
+ 
+@app.post("/token")
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect username or password")
+    access_token = create_access_token({"sub": user["username"]})
+    os.environ["ACCESS_TOKEN"] = access_token   
     return {"access_token": access_token, "token_type": "bearer"}
 
+@app.get("/users/me")
+async def read_users_me(current_user: dict = Depends(get_current_user)):
+    return current_user  
 
-# Post request to generate image from prompt
-@router.post("/")
-async def rpg(token: Annotated[str, Depends(oauth2_scheme)], params: AppParams):
+@app.post("/dataputket_rpg")
+async def rpg(params: AppParams, Authorization: Optional[str] = Header(None)):
+    # Get header from request
+    # Get request
+    #headers = request.headers
+    #token = headers.get("Authorization")
+    print(Authorization)
+    token = Authorization.split("Bearer ")[1]
+    token =  jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    print(params)
+
     version_list = ["multi-attribute","complex-object"]
     logger.debug(f"params: {params}")
     user_prompt = params.user_prompt
@@ -151,7 +190,8 @@ async def rpg(token: Annotated[str, Depends(oauth2_scheme)], params: AppParams):
 
     # Initialize model
     initialize(model_name= 'albedobaseXL_v20.safetensors')
-        
+     
+       
     image=RPG(user_prompt=user_prompt,
         diffusion_model=model_name,
         version=version,
@@ -186,15 +226,12 @@ async def rpg(token: Annotated[str, Depends(oauth2_scheme)], params: AppParams):
     return FileResponse(f"generated_imgs/{file_names[0]}", media_type="image/png")  
     
 
-# Finally create application, add router and run app
-app = FastAPI()
-app.include_router(router)
 
 origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware, 
-    allowed_origins=origins,
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

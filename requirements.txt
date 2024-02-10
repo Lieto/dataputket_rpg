@@ -2,7 +2,9 @@ python-dotenv
 fastapi
 loguru
 git+https://github.com/huggingface/transformers.git
-gradio
+gradio==3.41.2
+gradio_client==0.5.0
+grpcio==1.60.0
 pytorch-lightning==1.9.4
 einops
 kornia 
@@ -22,6 +24,7 @@ piexif
 lark 
 tensorboard 
 blendmodes
+fastapi_login
 
 
 
