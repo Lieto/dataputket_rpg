@@ -4,16 +4,95 @@ import os
 import sys
 import time
 
-import torch
-from dotenv import load_dotenv
-from fastapi import APIRouter, FastAPI, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm    
-from fastapi_login import LoginManager
+from __future__ import print_function
+
+from fastapi import FastAPI, Depends, HTTPException, status, Header, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordRequestForm, HTTPAuthorizationCredentials, LoginManager    
 from fastapi.responses import FileResponse 
-from loguru import logger
+from datetime import datetime, timedelta
+import jwt 
+from loguru import logger 
+from passlib.context import CryptContext
+from typing import Optional, Annotated
 from pydantic import BaseModel
-from typing import Annotated
+import dotenv 
+
+from dataputket_rpg import initialize, RPG  
+
+import os 
+
+dotenv.load_dotenv()
+
+app = FastAPI()
+security = HTTPBearer()
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+SECRET_KEY ="your_secret_key"
+ALGORITHM = "HS256"
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto") 
+hash1 = pwd_context.hash("dataputket_test_Lollero123")
+USERS = [
+    {"username": "dataputket_test", "password": hash1},
+]
+
+access_token = None 
+  
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)      
+
+def authenticate_token(token: OAuth2PasswordBearer = Depends(oauth2_scheme)):
+    
+    print(f"token: {token}")
+    print(f"access_token: {os.getenv('ACCESS_TOKEN')}")
+    
+    access_token = os.getenv("ACCESS_TOKEN")  
+    
+    if token != access_token:
+        raise HTTPException(status_code=401, 
+                            detail="Invalid authentication credentials", 
+                            headers={"WWW-Authenticate": "Bearer"},
+                            )
+    return True 
+   
+def authenticate_user(username: str, password: str):
+    user = next(
+        (user for user in USERS if user["username"] == username), None
+    )
+    if not user:
+        return False
+    if not verify_password(password, user["password"]):
+        return False
+    return user
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    #encoded_jwt = jwt.encode_payload(to_encode)
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise HTTPException(status_code=401, detail="Could not validate credentials", headers={"WWW-Authenticate": "Bearer"}) 
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Could not validate credentials", headers={"WWW-Authenticate": "Bearer"})
+    user = next((user for user in USERS if user["username"] == username), None)
+    if user is None:
+        raise HTTPException(status_code=401, detail="User not found", headers={"WWW-Authenticate": "Bearer"})
+    return user
+
 
 
 
@@ -21,12 +100,15 @@ from typing import Annotated
 # have to copy '.env' file to server to use it
 # `load_dotenv()` is a function from the `dotenv` library in Python. It is used to load
 # the environment variables from a `.env` file into the current environment.
-load_dotenv()
+#load_dotenv()
 
 
 
-SECRET = os.getenv("SECRET")
-manager = LoginManager(SECRET, tokenUrl="/auth/token")
+#SECRET = os.getenv("SECRET")
+SECRET = os.urandom(24).hex()
+print(SECRET)   
+#SECRET = "dataputket_rpg_Lollero&123"
+manager = LoginManager(SECRET, token_url="/auth/token")
 fake_users_db = {
     "dataputket_test": {
         "username": "dataputket_test",
@@ -79,7 +161,7 @@ class AppParams(BaseModel):
     # width: Width of image to generate
     width: int = 1024
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(token_url="token")
     
 # Add router to app
 router = APIRouter(prefix="/dataputket_rpg")
@@ -93,8 +175,8 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    hashed_password = user_dict["hashed_password"]
-    if not manager.verify_password(form_data.password, hashed_password):
+    
+    elif fake_hash_password(form_data.password) != user_dict["hashed_password"]:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -151,7 +233,8 @@ async def rpg(token: Annotated[str, Depends(oauth2_scheme)], params: AppParams):
 
     # Initialize model
     initialize(model_name= 'albedobaseXL_v20.safetensors')
-        
+     
+       
     image=RPG(user_prompt=user_prompt,
         diffusion_model=model_name,
         version=version,
@@ -194,7 +277,7 @@ origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware, 
-    allowed_origins=origins,
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

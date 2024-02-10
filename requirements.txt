@@ -22,6 +22,8 @@ piexif
 lark 
 tensorboard 
 blendmodes
+fastapi_login
+python-multipart
 
 
 
